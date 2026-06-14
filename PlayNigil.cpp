@@ -2,231 +2,289 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <cctype>
+#include <cwctype>
 #include <sstream>
 #include <algorithm>
+#include <locale>
 
 using namespace std;
 
-// ---------- Общие вспомогательные функции ----------
-char normalize(char c) {
-    c = toupper(c);
-    if (c == 'J') c = 'I';
-    return c;
+// ---------- Шифр Нигилистов (русский, 6×6) ----------
+const wstring ALPHABET_6X6 = L"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,";
+const int SIZE6 = 6;
+
+wchar_t normalize6(wchar_t c) {
+    return towupper(c);
 }
 
-string cleanText(const string& input) {
-    string res;
-    for (char c : input)
-        if (isalpha(c)) res += normalize(c);
-    return res;
-}
-
-// ================== НИГИЛИСТОВ ==================
-void nihilist_buildTable(const string& keyword, char table[5][5],
-                         map<char, pair<int,int>>& charToPos) {
-    string used = "", alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ";
-    for (char ch : keyword) {
-        ch = normalize(ch);
-        if (ch >= 'A' && ch <= 'Z' && used.find(ch) == string::npos)
-            used += ch;
+wstring clean6(const wstring& s) {
+    wstring r;
+    for (wchar_t c : s) {
+        c = normalize6(c);
+        if (ALPHABET_6X6.find(c) != wstring::npos) r += c;
     }
+    return r;
+}
+
+void nihilist_buildTable(const wstring& key, wchar_t table[SIZE6][SIZE6],
+                         map<wchar_t, pair<int,int>>& pos) {
+    wstring used;
+    for (wchar_t c : key) {
+        c = normalize6(c);
+        if (ALPHABET_6X6.find(c) != wstring::npos && used.find(c) == wstring::npos)
+            used += c;
+    }
+    for (wchar_t c : ALPHABET_6X6)
+        if (used.find(c) == wstring::npos) used += c;
     int idx = 0;
-    for (char ch : used) {
-        int r = idx/5, c = idx%5;
-        table[r][c] = ch;
-        charToPos[ch] = {r+1, c+1};
-        idx++;
-    }
-    for (char ch : alphabet) {
-        if (used.find(ch) == string::npos && idx < 25) {
-            int r = idx/5, c = idx%5;
-            table[r][c] = ch;
-            charToPos[ch] = {r+1, c+1};
-            idx++;
+    for (int i = 0; i < SIZE6; i++)
+        for (int j = 0; j < SIZE6; j++) {
+            wchar_t c = used[idx++];
+            table[i][j] = c;
+            pos[c] = {i+1, j+1};
         }
-    }
 }
 
-int nihilist_getCoord(char c, const map<char, pair<int,int>>& charToPos) {
-    c = normalize(c);
-    auto it = charToPos.find(c);
-    if (it == charToPos.end()) throw runtime_error("Символ отсутствует в таблице");
+int nihilist_getCoord(wchar_t c, const map<wchar_t, pair<int,int>>& pos) {
+    c = normalize6(c);
+    auto it = pos.find(c);
+    if (it == pos.end()) throw runtime_error("Символ не найден");
     auto [r, col] = it->second;
     return r*10 + col;
 }
 
-char nihilist_coordToChar(int coord, const char table[5][5]) {
+wchar_t nihilist_coordToChar(int coord, const wchar_t table[SIZE6][SIZE6]) {
     int r = coord/10 - 1, c = coord%10 - 1;
-    if (r<0 || r>4 || c<0 || c>4) throw runtime_error("Неверная координата");
+    if (r<0 || r>=SIZE6 || c<0 || c>=SIZE6) throw runtime_error("Неверная координата");
     return table[r][c];
 }
 
-vector<int> nihilist_encrypt(const string& text, const string& gammaKey,
-                             const char table[5][5], const map<char,pair<int,int>>& pos) {
-    string gamma;
-    while (gamma.size() < text.size()) gamma += gammaKey;
-    gamma.resize(text.size());
+vector<int> nihilist_encrypt(const wstring& text, const wstring& gamma,
+                             const wchar_t table[SIZE6][SIZE6],
+                             const map<wchar_t, pair<int,int>>& pos) {
+    wstring g = gamma;
+    while (g.size() < text.size()) g += gamma;
+    g.resize(text.size());
     vector<int> res;
-    for (size_t i=0; i<text.size(); ++i) {
+    for (size_t i = 0; i < text.size(); ++i) {
         int p = nihilist_getCoord(text[i], pos);
-        int g = nihilist_getCoord(gamma[i], pos);
-        res.push_back(p + g);
+        int k = nihilist_getCoord(g[i], pos);
+        res.push_back(p + k);
     }
     return res;
 }
 
-string nihilist_decrypt(const vector<int>& enc, const string& gammaKey,
-                        const char table[5][5], const map<char,pair<int,int>>& pos) {
-    string gamma;
-    while (gamma.size() < enc.size()) gamma += gammaKey;
-    gamma.resize(enc.size());
-    string res;
-    for (size_t i=0; i<enc.size(); ++i) {
-        int g = nihilist_getCoord(gamma[i], pos);
-        int p = enc[i] - g;
-        if (p<11 || p>55) throw runtime_error("Ошибка расшифрования");
+wstring nihilist_decrypt(const vector<int>& enc, const wstring& gamma,
+                         const wchar_t table[SIZE6][SIZE6],
+                         const map<wchar_t, pair<int,int>>& pos) {
+    wstring g = gamma;
+    while (g.size() < enc.size()) g += gamma;
+    g.resize(enc.size());
+    wstring res;
+    for (size_t i = 0; i < enc.size(); ++i) {
+        int k = nihilist_getCoord(g[i], pos);
+        int p = enc[i] - k;
+        if (p < 11 || p > 66) throw runtime_error("Ошибка расшифрования");
         res += nihilist_coordToChar(p, table);
     }
     return res;
 }
 
-// ================== ПЛЕЙФЕРА ==================
-void playfair_buildMatrix(const string& keyword, char m[5][5],
-                          map<char, pair<int,int>>& pos) {
-    string used = "", alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ";
-    for (char c : keyword) {
-        c = normalize(c);
-        if (c>='A' && c<='Z' && used.find(c)==string::npos) used += c;
+// ---------- Шифр Плейфера (русский 8×4 / английский 5×5) ----------
+wstring playfair_clean(const wstring& s, bool russian) {
+    wstring alphabet = russian ? L"АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+                               : L"ABCDEFGHIKLMNOPQRSTUVWXYZ";
+    wstring res;
+    for (wchar_t c : s) {
+        c = towupper(c);
+        if (russian && c == L'Ё') c = L'Е';      // Ё -> Е
+        if (!russian && c == L'J') c = L'I';    // J -> I
+        if (alphabet.find(c) != wstring::npos) res += c;
     }
-    for (char c : alphabet)
-        if (used.find(c)==string::npos) used += c;
-    for (int i=0; i<5; ++i)
-        for (int j=0; j<5; ++j) {
-            char c = used[i*5+j];
-            m[i][j] = c;
+    return res;
+}
+
+void playfair_buildMatrix(const wstring& key, bool russian,
+                          vector<vector<wchar_t>>& matrix,
+                          map<wchar_t, pair<int,int>>& pos) {
+    wstring alphabet = russian ? L"АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+                               : L"ABCDEFGHIKLMNOPQRSTUVWXYZ";
+    int rows = russian ? 8 : 5;
+    int cols = russian ? 4 : 5;
+    wstring used;
+    wstring cleanKey;
+    for (wchar_t c : key) {
+        c = towupper(c);
+        if (russian && c == L'Ё') c = L'Е';
+        if (!russian && c == L'J') c = L'I';
+        if (alphabet.find(c) != wstring::npos && used.find(c) == wstring::npos)
+            used += c;
+    }
+    for (wchar_t c : alphabet)
+        if (used.find(c) == wstring::npos) used += c;
+
+    matrix.assign(rows, vector<wchar_t>(cols));
+    pos.clear();
+    for (int i = 0, idx = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++) {
+            wchar_t c = used[idx++];
+            matrix[i][j] = c;
             pos[c] = {i, j};
         }
 }
 
-string playfair_prepare(const string& raw) {
-    string t = cleanText(raw);
-    if (t.empty()) return "";
-    string prep;
-    for (size_t i=0; i<t.length(); ++i) {
+wstring playfair_prepare(const wstring& raw, bool russian) {
+    wstring t = playfair_clean(raw, russian);
+    if (t.empty()) return L"";
+    wchar_t filler = russian ? L'Ъ' : L'X';
+    wstring prep;
+    for (size_t i = 0; i < t.length(); i++) {
         prep += t[i];
-        if (i+1 < t.length() && t[i]==t[i+1]) prep += 'X';
+        if (i+1 < t.length() && t[i] == t[i+1])
+            prep += filler;
     }
-    if (prep.length()%2) prep += 'X';
+    if (prep.length() % 2) prep += filler;
     return prep;
 }
 
-string playfair_encryptDigraph(char a, char b, const char m[5][5],
-                               const map<char,pair<int,int>>& pos) {
-    auto [r1,c1] = pos.at(a);
-    auto [r2,c2] = pos.at(b);
-    if (r1 == r2)      return { m[r1][(c1+1)%5], m[r2][(c2+1)%5] };
-    else if (c1 == c2) return { m[(r1+1)%5][c1], m[(r2+1)%5][c2] };
-    else               return { m[r1][c2], m[r2][c1] };
+wstring playfair_transform(const wstring& text, bool russian,
+                           const vector<vector<wchar_t>>& matrix,
+                           const map<wchar_t, pair<int,int>>& pos,
+                           bool decrypt) {
+    int rows = russian ? 8 : 5;
+    int cols = russian ? 4 : 5;
+    wstring result;
+    for (size_t i = 0; i < text.length(); i += 2) {
+        wchar_t a = text[i], b = text[i+1];
+        auto [r1, c1] = pos.at(a);
+        auto [r2, c2] = pos.at(b);
+        wchar_t cA, cB;
+        if (r1 == r2) {
+            int shift = decrypt ? (cols - 1) : 1;
+            cA = matrix[r1][(c1 + shift) % cols];
+            cB = matrix[r2][(c2 + shift) % cols];
+        } else if (c1 == c2) {
+            int shift = decrypt ? (rows - 1) : 1;
+            cA = matrix[(r1 + shift) % rows][c1];
+            cB = matrix[(r2 + shift) % rows][c2];
+        } else {
+            cA = matrix[r1][c2];
+            cB = matrix[r2][c1];
+        }
+        result += cA;
+        result += cB;
+    }
+    return result;
 }
 
-string playfair_decryptDigraph(char a, char b, const char m[5][5],
-                               const map<char,pair<int,int>>& pos) {
-    auto [r1,c1] = pos.at(a);
-    auto [r2,c2] = pos.at(b);
-    if (r1 == r2)      return { m[r1][(c1+4)%5], m[r2][(c2+4)%5] };
-    else if (c1 == c2) return { m[(r1+4)%5][c1], m[(r2+4)%5][c2] };
-    else               return { m[r1][c2], m[r2][c1] };
+wstring playfair_encrypt(const wstring& plain, bool russian,
+                         const vector<vector<wchar_t>>& matrix,
+                         const map<wchar_t, pair<int,int>>& pos) {
+    wstring prep = playfair_prepare(plain, russian);
+    return playfair_transform(prep, russian, matrix, pos, false);
 }
 
-string playfair_encrypt(const string& text, const char m[5][5],
-                        const map<char,pair<int,int>>& pos) {
-    string prep = playfair_prepare(text);
-    string res;
-    for (size_t i=0; i<prep.length(); i+=2)
-        res += playfair_encryptDigraph(prep[i], prep[i+1], m, pos);
-    return res;
+wstring playfair_decrypt(const wstring& cipher, bool russian,
+                         const vector<vector<wchar_t>>& matrix,
+                         const map<wchar_t, pair<int,int>>& pos) {
+    wstring clean = playfair_clean(cipher, russian);
+    if (clean.length() % 2) throw runtime_error("Длина шифротекста должна быть чётной");
+    return playfair_transform(clean, russian, matrix, pos, true);
 }
 
-string playfair_decrypt(const string& text, const char m[5][5],
-                        const map<char,pair<int,int>>& pos) {
-    string clean = cleanText(text);
-    if (clean.length()%2) throw runtime_error("Длина шифротекста должна быть чётной");
-    string res;
-    for (size_t i=0; i<clean.length(); i+=2)
-        res += playfair_decryptDigraph(clean[i], clean[i+1], m, pos);
-    return res;
-}
-
-// ================== ГЛАВНОЕ МЕНЮ ==================
+// ========== Главное меню ==========
 int main() {
-    setlocale(LC_ALL, "Russian");
+    locale::global(locale("ru_RU.UTF-8"));
+    wcin.imbue(locale());
+    wcout.imbue(locale());
+
     int cipher = 0;
     while (cipher != 3) {
-        cout << "\n=== ВЫБОР ШИФРА ===\n1 - Нигилистов\n2 - Плейфера\n3 - Выход\nВаш выбор: ";
+        wcout << L"\n=== ВЫБОР ШИФРА ===\n1 - Нигилистов\n2 - Плейфера\n3 - Выход\nВаш выбор: ";
         cin >> cipher; cin.ignore();
-        if (cipher == 3) { cout << "До свидания!\n"; break; }
-        if (cipher != 1 && cipher != 2) { cout << "Неверный выбор\n"; continue; }
+        if (cipher == 3) { wcout << L"До свидания!\n"; break; }
+        if (cipher != 1 && cipher != 2) { wcout << L"Неверный выбор\n"; continue; }
 
-        if (cipher == 1) { // Нигилистов
-            string tableKey, gammaKey;
-            cout << "Ключ таблицы: "; getline(cin, tableKey);
-            cout << "Гамма-ключ: ";   getline(cin, gammaKey);
+        if (cipher == 1) {
+            // Нигилистов (русский 6×6)
+            wstring tableKey, gammaKey;
+            wcout << L"Ключ таблицы: "; getline(wcin, tableKey);
+            wcout << L"Гамма-ключ: ";   getline(wcin, gammaKey);
+            tableKey = clean6(tableKey);
+            gammaKey = clean6(gammaKey);
             if (tableKey.empty() || gammaKey.empty()) {
-                cout << "Ключи не могут быть пустыми\n"; continue;
+                wcout << L"Ключи должны содержать символы алфавита\n"; continue;
             }
-            char table[5][5];
-            map<char,pair<int,int>> pos;
+            wchar_t table[SIZE6][SIZE6];
+            map<wchar_t, pair<int,int>> pos;
             nihilist_buildTable(tableKey, table, pos);
 
             int op = 0;
             while (op != 3) {
-                cout << "\n[Нигилистов] 1-Зашифровать 2-Расшифровать 3-Назад: ";
+                wcout << L"\n[Нигилистов] 1-Зашифровать 2-Расшифровать 3-Назад: ";
                 cin >> op; cin.ignore();
                 try {
                     if (op == 1) {
-                        cout << "Текст: "; string s; getline(cin, s);
-                        s = cleanText(s);
-                        if (s.empty()) { cout << "Нет букв\n"; continue; }
+                        wcout << L"Текст: "; wstring s; getline(wcin, s);
+                        s = clean6(s);
+                        if (s.empty()) { wcout << L"Нет допустимых символов\n"; continue; }
                         auto enc = nihilist_encrypt(s, gammaKey, table, pos);
-                        cout << "Шифротекст: ";
-                        for (int x : enc) cout << x << ' ';
-                        cout << '\n';
+                        wcout << L"Шифротекст: ";
+                        for (int x : enc) wcout << x << L' ';
+                        wcout << L'\n';
                     } else if (op == 2) {
-                        cout << "Числа через пробел: "; string line; getline(cin, line);
+                        wcout << L"Числа через пробел: ";
+                        string line; getline(cin, line);
                         istringstream iss(line);
                         vector<int> v; int x;
                         while (iss >> x) v.push_back(x);
-                        if (v.empty()) { cout << "Нет чисел\n"; continue; }
-                        cout << "Расшифровка: " << nihilist_decrypt(v, gammaKey, table, pos) << '\n';
+                        if (v.empty()) { wcout << L"Нет чисел\n"; continue; }
+                        wcout << L"Расшифровка: " << nihilist_decrypt(v, gammaKey, table, pos) << L'\n';
                     }
-                } catch (const exception& e) { cout << "Ошибка: " << e.what() << '\n'; }
+                } catch (const exception& e) {
+                    wcout << L"Ошибка: " << e.what() << L'\n';
+                }
             }
-        } else { // Плейфера
-            string key;
-            cout << "Ключ: "; getline(cin, key);
-            if (key.empty()) { cout << "Ключ пуст\n"; continue; }
-            char m[5][5];
-            map<char,pair<int,int>> pos;
-            playfair_buildMatrix(key, m, pos);
-            cout << "Матрица:\n";
-            for (auto & row : m) {
-                for (char c : row) cout << c << ' ';
-                cout << '\n';
+        } else {
+            // Плейфера – выбор языка
+            int lang = 0;
+            while (lang != 1 && lang != 2) {
+                wcout << L"\nВыберите язык:\n1 - Русский (8×4)\n2 - Английский (5×5)\nВаш выбор: ";
+                cin >> lang; cin.ignore();
             }
+            bool russian = (lang == 1);
+
+            wstring key;
+            wcout << L"Ключ: "; getline(wcin, key);
+            key = playfair_clean(key, russian);
+            if (key.empty()) { wcout << L"Ключ не содержит допустимых символов\n"; continue; }
+
+            vector<vector<wchar_t>> matrix;
+            map<wchar_t, pair<int,int>> pos;
+            playfair_buildMatrix(key, russian, matrix, pos);
+
+            // Вывод матрицы
+            wcout << L"Матрица:\n";
+            for (const auto& row : matrix) {
+                for (wchar_t c : row) wcout << c << L' ';
+                wcout << L'\n';
+            }
+
             int op = 0;
             while (op != 3) {
-                cout << "\n[Плейфера] 1-Зашифровать 2-Расшифровать 3-Назад: ";
+                wcout << L"\n[Плейфера] 1-Зашифровать 2-Расшифровать 3-Назад: ";
                 cin >> op; cin.ignore();
                 try {
                     if (op == 1) {
-                        cout << "Текст: "; string s; getline(cin, s);
-                        cout << "Шифротекст: " << playfair_encrypt(s, m, pos) << '\n';
+                        wcout << L"Текст: "; wstring s; getline(wcin, s);
+                        wcout << L"Шифротекст: " << playfair_encrypt(s, russian, matrix, pos) << L'\n';
                     } else if (op == 2) {
-                        cout << "Шифротекст: "; string s; getline(cin, s);
-                        cout << "Расшифровка: " << playfair_decrypt(s, m, pos) << '\n';
+                        wcout << L"Шифротекст: "; wstring s; getline(wcin, s);
+                        wcout << L"Расшифровка: " << playfair_decrypt(s, russian, matrix, pos) << L'\n';
                     }
-                } catch (const exception& e) { cout << "Ошибка: " << e.what() << '\n'; }
+                } catch (const exception& e) {
+                    wcout << L"Ошибка: " << e.what() << L'\n';
+                }
             }
         }
     }
