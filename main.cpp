@@ -1,142 +1,202 @@
 #include <iostream>
-#include <locale>
-#include <sstream>
-#include <limits>
-#include "ciphers.h"
-
+#include <string>
+#include <vector>
+#include "playfair(rus).h"
+#include "playfair(eng).h"
 using namespace std;
 
-// Очистка текста для Нигилистов (только символы его алфавита)
-wstring cleanNihilText(const wstring& s) {
-    const wstring NIHIL_ALPH = L"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,";
-    wstring r;
-    for (wchar_t c : s) {
-        c = towupper(c);
-        if (NIHIL_ALPH.find(c) != wstring::npos) r += c;
+// Пункты общего меню (выбор языка)
+enum class Language {
+    Exit = 0,
+    Russian = 1,
+    English = 2
+};
+
+// Меню для русского шифра
+void runRussianMenu() {
+    string matrix[4][8];
+    bool keySet = false;
+
+    while (true) {
+        cout << "\n===== Русский шифр Плейфера =====\n";
+        cout << "1. Задать ключ\n";
+        cout << "2. Зашифровать сообщение\n";
+        cout << "3. Расшифровать сообщение\n";
+        cout << "0. Назад (к выбору языка)\n";
+        cout << "Выберите действие: ";
+
+        int choice;
+        cin >> choice;
+        cin.ignore();
+
+        if (choice == 0) break;
+
+        switch (choice) {
+            case 1: {
+                cout << "Введите ключ (слово или фразу): ";
+                string keyInput;
+                getline(cin, keyInput);
+                buildMatrixRu(keyInput, matrix);
+                keySet = true;
+
+                cout << "\nКлючевая матрица 4x8:\n";
+                for (int r = 0; r < 4; r++) {
+                    for (int c = 0; c < 8; c++) {
+                        cout << matrix[r][c] << " ";
+                    }
+                    cout << endl;
+                }
+                break;
+            }
+            case 2:
+            case 3: {
+                if (!keySet) {
+                    cout << "Ошибка: сначала задайте ключ (пункт 1).\n";
+                    break;
+                }
+
+                cout << "Введите сообщение: ";
+                string message;
+                getline(cin, message);
+
+                vector<string> prepared;
+                if (choice == 2)
+                    prepared = prepareForEncryptionRu(message);
+                else
+                    prepared = prepareForDecryptionRu(message);
+
+                if (prepared.empty()) {
+                    cout << "Сообщение не содержит русских букв.\n";
+                    break;
+                }
+
+                string result;
+                size_t total = prepared.size();
+                size_t i = 0;
+                for (; i + 1 < total; i += 2) {
+                    if (choice == 2)
+                        result += encryptBigramRu(prepared[i], prepared[i + 1], matrix);
+                    else
+                        result += decryptBigramRu(prepared[i], prepared[i + 1], matrix);
+                }
+                if (i < total)
+                    result += prepared[i];
+
+                cout << (choice == 2 ? "Зашифрованное" : "Расшифрованное")
+                     << " сообщение:\n" << result << endl;
+                break;
+            }
+            default:
+                cout << "Неверный пункт меню.\n";
+        }
     }
-    return r;
+}
+
+// Меню для английского шифра
+void runEnglishMenu() {
+    string matrix[5][5];
+    bool keySet = false;
+
+    while (true) {
+        cout << "\n===== English Playfair Cipher =====\n";
+        cout << "1. Set key\n";
+        cout << "2. Encrypt message\n";
+        cout << "3. Decrypt message\n";
+        cout << "0. Back (to language selection)\n";
+        cout << "Choose an action: ";
+
+        int choice;
+        cin >> choice;
+        cin.ignore();
+
+        if (choice == 0) break;
+
+        switch (choice) {
+            case 1: {
+                cout << "Enter the key (word or phrase): ";
+                string keyInput;
+                getline(cin, keyInput);
+                buildMatrixEn(keyInput, matrix);
+                keySet = true;
+
+                cout << "\nKey matrix 5x5:\n";
+                for (int r = 0; r < 5; r++) {
+                    for (int c = 0; c < 5; c++) {
+                        cout << matrix[r][c] << " ";
+                    }
+                    cout << endl;
+                }
+                break;
+            }
+            case 2:
+            case 3: {
+                if (!keySet) {
+                    cout << "Error: set the key first (option 1).\n";
+                    break;
+                }
+
+                cout << "Enter the message: ";
+                string message;
+                getline(cin, message);
+
+                vector<char> prepared;
+                if (choice == 2)
+                    prepared = prepareForEncryptionEn(message);
+                else
+                    prepared = prepareForDecryptionEn(message);
+
+                if (prepared.empty()) {
+                    cout << "Message contains no English letters.\n";
+                    break;
+                }
+
+                string result;
+                size_t total = prepared.size();
+                size_t i = 0;
+                for (; i + 1 < total; i += 2) {
+                    if (choice == 2)
+                        result += encryptBigramEn(prepared[i], prepared[i + 1], matrix);
+                    else
+                        result += decryptBigramEn(prepared[i], prepared[i + 1], matrix);
+                }
+                if (i < total)
+                    result += prepared[i];
+
+                cout << (choice == 2 ? "Encrypted" : "Decrypted")
+                     << " message:\n" << result << endl;
+                break;
+            }
+            default:
+                cout << "Invalid menu option.\n";
+        }
+    }
 }
 
 int main() {
-    // Настройка локали для русского языка
-    locale::global(locale("ru_RU.UTF-8"));
-    wcin.imbue(locale());
-    wcout.imbue(locale());
+    while (true) {
+        cout << "\n===== Главное меню =====\n";
+        cout << "1. Русский шифр Плейфера\n";
+        cout << "2. English Playfair Cipher\n";
+        cout << "0. Выход\n";
+        cout << "Выберите язык (0,1,2): ";
 
-    int cipher = 0;
-    while (cipher != 3) {
-        wcout << L"\n=== ВЫБОР ШИФРА ===\n"
-              << L"1 — Нигилистов (русский, 6×6)\n"
-              << L"2 — Плейфера\n"
-              << L"3 — Выход\n"
-              << L"Ваш выбор: ";
-        wcin >> cipher;
-        wcin.ignore(numeric_limits<streamsize>::max(), L'\n');
+        int langInput;
+        cin >> langInput;
+        cin.ignore();
 
-        if (cipher == 3) { wcout << L"До свидания!\n"; break; }
-        if (cipher != 1 && cipher != 2) { wcout << L"Неверный выбор\n"; continue; }
+        Language lang = static_cast<Language>(langInput);
 
-        if (cipher == 1) {
-            // ---------- Нигилистов ----------
-            wstring tableKey, gammaKey;
-            wcout << L"Ключ таблицы: "; getline(wcin, tableKey);
-            wcout << L"Гамма-ключ: ";   getline(wcin, gammaKey);
-            tableKey = cleanNihilText(tableKey);
-            gammaKey = cleanNihilText(gammaKey);
-            if (tableKey.empty() || gammaKey.empty()) {
-                wcout << L"Ключи должны содержать символы русского алфавита (включая пробел,.,)\n";
-                continue;
-            }
-
-            wchar_t table[6][6];
-            map<wchar_t, pair<int,int>> pos;
-            nihilist_buildTable(tableKey, table, pos);
-
-            int op = 0;
-            while (op != 3) {
-                wcout << L"\n[Нигилистов] 1-Зашифровать 2-Расшифровать 3-Назад: ";
-                wcin >> op;
-                wcin.ignore(numeric_limits<streamsize>::max(), L'\n');
-                try {
-                    if (op == 1) {
-                        wcout << L"Текст: "; wstring s; getline(wcin, s);
-                        s = cleanNihilText(s);
-                        if (s.empty()) { wcout << L"Нет допустимых символов\n"; continue; }
-                        auto enc = nihilist_encrypt(s, gammaKey, table, pos);
-                        wcout << L"Шифротекст (числа): ";
-                        for (int x : enc) wcout << x << L' ';
-                        wcout << L'\n';
-                    } else if (op == 2) {
-                        wcout << L"Числа через пробел: ";
-                        wstring line; getline(wcin, line);
-                        wistringstream wiss(line);
-                        vector<int> v; int x;
-                        while (wiss >> x) v.push_back(x);
-                        if (v.empty()) { wcout << L"Нет чисел\n"; continue; }
-                        wstring dec = nihilist_decrypt(v, gammaKey, table, pos);
-                        wcout << L"Расшифровка: " << dec << L'\n';
-                    }
-                } catch (const exception& e) {
-                    wcout << L"Ошибка: " << e.what() << L'\n';
-                }
-            }
-        } else {
-            // ---------- Плейфера ----------
-            int lang = 0;
-            while (lang != 1 && lang != 2) {
-                wcout << L"\nВыберите язык:\n1 — Русский (8×4)\n2 — Английский (5×5)\nВаш выбор: ";
-                wcin >> lang;
-                wcin.ignore(numeric_limits<streamsize>::max(), L'\n');
-            }
-            bool russian = (lang == 1);
-
-            wcout << L"Ключ: ";
-            wstring keyRaw; getline(wcin, keyRaw);
-            // Очистка ключа по алфавиту
-            const wstring& alphabet = russian ? L"АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
-                                             : L"ABCDEFGHIKLMNOPQRSTUVWXYZ";
-            wstring key;
-            for (wchar_t c : keyRaw) {
-                c = towupper(c);
-                if (russian && c == L'Ё') c = L'Е';
-                if (!russian && c == L'J') c = L'I';
-                if (alphabet.find(c) != wstring::npos) key += c;
-            }
-            if (key.empty()) { wcout << L"Ключ не содержит допустимых символов\n"; continue; }
-
-            vector<vector<wchar_t>> matrix;
-            map<wchar_t, pair<int,int>> pos;
-            playfair_buildMatrix(key, russian, matrix, pos);
-
-            wcout << L"Матрица:\n";
-            for (const auto& row : matrix) {
-                for (wchar_t c : row) wcout << c << L' ';
-                wcout << L'\n';
-            }
-
-            int op = 0;
-            while (op != 3) {
-                wcout << L"\n[Плейфера] 1-Зашифровать 2-Расшифровать 3-Назад: ";
-                wcin >> op;
-                wcin.ignore(numeric_limits<streamsize>::max(), L'\n');
-                try {
-                    if (op == 1) {
-                        wcout << L"Текст: "; wstring s; getline(wcin, s);
-                        if (s.empty()) { wcout << L"Пустой ввод\n"; continue; }
-                        wstring enc = playfair_encrypt(s, russian, matrix, pos);
-                        if (enc.empty()) wcout << L"Нет допустимых символов\n";
-                        else wcout << L"Шифротекст: " << enc << L'\n';
-                    } else if (op == 2) {
-                        wcout << L"Шифротекст: "; wstring s; getline(wcin, s);
-                        if (s.empty()) { wcout << L"Пустой ввод\n"; continue; }
-                        wstring dec = playfair_decrypt(s, russian, matrix, pos);
-                        if (dec.empty()) wcout << L"Некорректный шифротекст\n";
-                        else wcout << L"Расшифровка: " << dec << L'\n';
-                    }
-                } catch (const exception& e) {
-                    wcout << L"Ошибка: " << e.what() << L'\n';
-                }
-            }
+        switch (lang) {
+            case Language::Russian:
+                runRussianMenu();
+                break;
+            case Language::English:
+                runEnglishMenu();
+                break;
+            case Language::Exit:
+                return 0;
+            default:
+                cout << "Неверный выбор. Попробуйте снова.\n";
         }
     }
     return 0;
