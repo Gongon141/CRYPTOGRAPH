@@ -47,5 +47,6 @@
 Требуется компилятор с поддержкой C++17 (или новее).
 
 ```bash
-g++ -std=c++17 -o ciphers main.cpp ciphers.cpp
-./ciphers
+g++ main.cpp cipher_library.cpp cli_options.cpp file_io.cpp key_generator.cpp -o rgr
+./rgr --help - (для помощи в выполнении)
+
