@@ -31,4 +31,4 @@ vector<char> nih_prepareTextEn(const string& raw);
 vector<char> nih_prepareKeyEn(const string& raw);
 
 // Построение ключевой матрицы 5×5
-void nih_buildMatrixEn(const string& keyInput, string matrix[5][5]);
+void nih_buildMatrixEn(const string& keyInput, string matrix[5][5]);//

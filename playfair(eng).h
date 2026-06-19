@@ -31,4 +31,4 @@ vector<char> prepareForEncryptionEn(const string& raw);
 vector<char> prepareForDecryptionEn(const string& raw);
 
 // Заполнение ключевой матрицы 5×5 по введённому ключу
-void buildMatrixEn(const string& keyInput, string matrix[5][5]);
+void buildMatrixEn(const string& keyInput, string matrix[5][5]);//

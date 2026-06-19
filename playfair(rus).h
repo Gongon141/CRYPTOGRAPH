@@ -31,4 +31,4 @@ vector<string> prepareForEncryptionRu(const string& raw);
 vector<string> prepareForDecryptionRu(const string& raw);
 
 // Заполнение ключевой матрицы 4×8 по введённому ключу
-void buildMatrixRu(const string& keyInput, string matrix[4][8]);
+void buildMatrixRu(const string& keyInput, string matrix[4][8]);//

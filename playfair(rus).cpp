@@ -141,4 +141,4 @@ void buildMatrixRu(const string& keyInput, string matrix[4][8]) {
             }
         }
     }
-}
+}//

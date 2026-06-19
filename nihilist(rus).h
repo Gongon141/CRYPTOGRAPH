@@ -33,4 +33,4 @@ vector<string> nih_prepareTextRu(const string& raw);
 vector<string> nih_prepareKeyRu(const string& raw);
 
 // Построение ключевой матрицы 4×8 по паролю (как в Плейфере)
-void nih_buildMatrixRu(const string& keyInput, string matrix[4][8]);
+void nih_buildMatrixRu(const string& keyInput, string matrix[4][8]);//
