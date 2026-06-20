@@ -1,8 +1,0 @@
-*.o
-*.so
-main
-libaffine.so
-libdh.so
-encrypted.txt
-decrypted.txt
-*~
