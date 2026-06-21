@@ -22,6 +22,7 @@
 #include "file_io.h"
 #include "key_generator.h"
 
+#include <limits>
 #include <climits>
 #include <cstdint>
 #include <iostream>
@@ -127,6 +128,32 @@ int run_generate_key(const CliOptions& options) {
     return EXIT_SUCCESS;
 }
 
+bool authorize() {
+    const std::string correct_password = "cryptum2026";
+
+    for (int attempt = 1; attempt <= 3; ++attempt) {
+        std::cout << "Введите пароль для доступа к программе: ";
+
+        std::string entered_password;
+        std::cin >> entered_password;
+        if (!std::cin) {            // поток ввода закрыт — входить некому
+            return false;
+        }
+
+        if (entered_password == correct_password) {
+            std::cout << "Доступ разрешён.\n";
+            return true;
+        }
+
+        std::cout << "Неверный пароль.";
+        if (attempt < 3) {
+            std::cout << " Осталось попыток: " << (3 - attempt);
+        }
+        std::cout << "\n";
+    }
+    return false;
+}
+
 // Шифрование или расшифрование
 int run_transformation(const CliOptions& options) {
     if (!options.has_algorithm) {
@@ -221,6 +248,14 @@ int run(const CliOptions& options) {
 } 
 
 int main(int argc, char* argv[]) {
+
+    // Авторизация: до доступа к любым функциям программы нужно ввести пароль.
+    // При неудаче программа сообщает об ошибке и завершает работу.
+    if (!authorize()) {
+        std::cerr << "Ошибка: доступ запрещён. Неверный пароль.\n";
+        return EXIT_FAILURE;
+    }
+
     // argv[0] (имя программы) пропускаем — разбираем только сами флаги.
     std::vector<std::string> arguments;
     for (int i = 1; i < argc; ++i) {
